@@ -37,11 +37,17 @@ export default async function EventDetailsPage(props: PageSegmentProps) {
           <p className="text-lg text-base-content opacity-80 mb-4">
             {event.location}
           </p>
-          <div className="mb-6 border-b pb-4">
+           <div className="mb-6 border-b pb-4">
             <p className="text-md font-semibold text-base-content">
               Dates:
               <span className="font-normal ml-2">{formattedDate}</span>
             </p>
+            {/* Fix margin to dynamically change upon screen size to be on right side of header. 
+            Will also need to be made a TouchableOpacity / other component that will allow the settings popup to appear.
+            Note, we are not using 'use client'. */}
+            <div className="flex justify-end">
+              <button className="border border-green-600 text-green-600 rounded-md p-2">Event Settings</button>  
+            </div>
           </div>
           {event.divisions && event.divisions.length > 0 && (
             <div className="mb-6 flex flex-col md:flex-row md:justify-between gap-8 md:gap-12">
