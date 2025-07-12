@@ -1,5 +1,6 @@
 import React from 'react'
 import JudgeQRCode from '@/components/JudgeQRCode'
+import { useState } from 'react';
 import { fetchJudgingPanelDataByEventId } from '@/lib/data'
 import type { JudgingPanelPerEvent } from '@/lib/definitions'
 
@@ -36,7 +37,9 @@ interface DisplayProps {
 }
 
 export default async function ManageJudgingPanelsDisplay({ eventId }: DisplayProps) {
-  const panels: JudgingPanelPerEvent[] | null = await fetchJudgingPanelDataByEventId(Number(eventId))
+  const [panels, setPanels] = useState<JudgingPanelPerEvent[]>([]);
+  const fetchedPanels = await fetchJudgingPanelDataByEventId(Number(eventId));
+  setPanels(fetchedPanels ?? []);
 
   if (!panels || panels.length === 0) {
     return (

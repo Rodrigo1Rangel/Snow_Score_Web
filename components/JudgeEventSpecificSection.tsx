@@ -22,6 +22,7 @@ export interface JudgesProps {
 
 export default function JudgeEventSpecificSection({ judges, event_id }: JudgesProps) {
     const [isEditionMode, setIsEditionMode] = useState(false);
+    const [judgesToRender, setJudgesToRender] = useState<Judge[]>(judges ?? []);
     const [confirmJudgeToRemove, setConfirmJudgeToRemove] = useState<Judge>();
     const [openRemoveJudge, setOpenRemoveJudge] = useState(false);
 
@@ -70,6 +71,7 @@ async function deleteJudgeNullScores(eventId: number, personnelId: string) {
         try {
             await deleteJudgeNullScores(judge.event_id, judge.personnel_id);
             await deleteJudge(judge.event_id, judge.personnel_id);
+            setJudgesToRender(prev => prev.filter(obj => obj.personnel_id !== judge.personnel_id))
         } catch (error) {
             console.error('Failed to remove judge', error);
         }
@@ -94,7 +96,7 @@ async function deleteJudgeNullScores(eventId: number, personnelId: string) {
 
                 {!isEditionMode ? (
                     <div>
-                        {judges?.map((judge) => (
+                        {judgesToRender?.map((judge) => (
                             <div
                                 key={judge.personnel_id}
                                 className="flex items-center justify-between py-2 border-b border-black dark:border-white"
@@ -107,7 +109,7 @@ async function deleteJudgeNullScores(eventId: number, personnelId: string) {
                     </div>
                 ) : (
                     <div>
-                        {judges?.map((judge) => (
+                        {judgesToRender?.map((judge) => (
                             <div
                                 key={judge.personnel_id}
                                 className="flex items-center justify-between py-2 border-b border-black dark:border-white"
