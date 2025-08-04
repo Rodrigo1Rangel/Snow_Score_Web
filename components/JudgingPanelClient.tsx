@@ -115,6 +115,7 @@ export default function JudgingPanelClient({
             ...prev,
             [`${entry.athlete_id}-${entry.run_num}`]: entry.score,
           }));
+
         }
       } catch {
         remaining.push(entry);
@@ -131,6 +132,7 @@ export default function JudgingPanelClient({
       setSubmissionFlag((prev) => !prev);
     }
   }
+
 
   useEffect(() => {
     const updateStatus = () => setIsOnline(navigator.onLine);
