@@ -9,6 +9,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { Toaster, toast } from "react-hot-toast";
+
 import {
   enqueueScoreSubmission,
   flushScoreQueue,
@@ -16,6 +17,7 @@ import {
 
 const ATHLETES_STORAGE_KEY = "cachedAthletes";
 const BEST_SCORES_STORAGE_KEY = "cachedBestScores";
+
 
 type JudgingPanelClientProps = {
   judgingPanelPasscode: number;
@@ -104,6 +106,7 @@ export default function JudgingPanelClient({
   }, []);
 
   useEffect(() => {
+
     const handleOnlineStatus = async () => {
       setIsOnline(navigator.onLine);
       if (navigator.onLine) {
@@ -133,6 +136,7 @@ export default function JudgingPanelClient({
     }, 5000);
     return () => clearInterval(interval);
   }, []);
+
 
   useEffect(() => {
     if (!eventId) return;
@@ -307,6 +311,7 @@ export default function JudgingPanelClient({
       return;
     }
 
+
     const payload = {
       round_heat_id: roundHeatId,
       run_num: runNum,
@@ -369,6 +374,7 @@ export default function JudgingPanelClient({
         [`${selected?.athlete_id}-${runNum}`]: parseFloat(score),
       }));
       setScore("");
+
     }
   };
 
