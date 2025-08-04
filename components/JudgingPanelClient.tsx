@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
 import {
   ChevronUp,
@@ -10,6 +10,11 @@ import {
 } from "lucide-react";
 import { Toaster, toast } from "react-hot-toast";
 import { eventNames } from "process";
+import {
+  enqueueScore,
+  flushQueue,
+  ScoreSubmission,
+} from "../lib/offlineQueue";
 
 type JudgingPanelClientProps = {
   judgingPanelPasscode: number;
@@ -77,6 +82,9 @@ export default function JudgingPanelClient({
   >({});
   const [bestScores, setBestScores] = useState<BestScore[]>([]);
   const [submissionFlag, setSubmissionFlag] = useState<boolean>(false);
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== "undefined" ? navigator.onLine : true
+  );
 
   useEffect(() => {
     if (!eventId) return;
@@ -114,6 +122,56 @@ export default function JudgingPanelClient({
         setBestScores([]);
       });
   }, [personnelId, roundHeatId, submissionFlag]);
+
+  const submitScore = useCallback(
+    async (payload: ScoreSubmission) => {
+      const response = await fetch(
+        "/api/scores-dj18dh12gpdi1yd89178tsadji1289",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      const data = await response.json();
+      console.log("Score submission response:", data);
+
+      if (response.ok) {
+        toast.success("Score submitted successfully", {
+          position: "bottom-center",
+        });
+        setSubmittedScores((prev) => ({
+          ...prev,
+          [`${payload.athlete_id}-${payload.run_num}`]: payload.score,
+        }));
+        setSubmissionFlag((prev) => !prev);
+        setScore("");
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      flushQueue(submitScore);
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    if (navigator.onLine) {
+      flushQueue(submitScore);
+    } else {
+      setIsOnline(false);
+    }
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [submitScore]);
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const sanitized = e.target.value.replace(/\D/g, "");
@@ -206,42 +264,29 @@ export default function JudgingPanelClient({
       return;
     }
 
-    console.log("SUBMITTING:", {
-      roundHeatId,
-      runNum,
-      personnelId,
-      score,
-    });
+    const payload: ScoreSubmission = {
+      round_heat_id: roundHeatId,
+      run_num: selected?.run_num ?? 0,
+      personnel_id: personnelId,
+      score: parseFloat(score),
+      athlete_id: selected?.athlete_id ?? 0,
+    };
 
-    const response = await fetch("/api/scores-dj18dh12gpdi1yd89178tsadji1289", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        round_heat_id: roundHeatId,
-        run_num: selected?.run_num,
-        personnel_id: personnelId,
-        score: parseFloat(score),
-        athlete_id: selected?.athlete_id,
-      }),
-    });
-    console.log(
-      `SELECTED RUN_NUM: ${selected?.run_num}, SCORE: ${score}, PERSONNEL_ID: ${personnelId}, ATHLETE_ID: ${selected?.athlete_id}, ROUND_HEAT_ID: ${roundHeatId}`
-    );
-
-    const data = await response.json();
-    console.log("Score submission response:", data);
-
-    if (response.ok) {
-      toast.success("Score submitted successfully", {
+    if (!isOnline) {
+      enqueueScore(payload);
+      toast.success("Score stored offline; will submit when back online", {
         position: "bottom-center",
       });
       setSubmittedScores((prev) => ({
         ...prev,
-        [`${selected?.athlete_id}-${runNum}`]: parseFloat(score),
+        [`${payload.athlete_id}-${payload.run_num}`]: payload.score,
       }));
-      setSubmissionFlag(!submissionFlag);
       setScore("");
+      return;
     }
+
+    await submitScore(payload);
+
     if (eventIsFinished) {
       alert("Event is finished, cannot submit scores.");
       return;
@@ -258,7 +303,11 @@ export default function JudgingPanelClient({
         <div></div>
         <div className="flex items-center justify-end bg-white border border-gray-300">
           {eventName}
-          ONLINE/OFFLINE
+          <span
+            className={`ml-4 font-bold ${isOnline ? "text-green-600" : "text-red-600"}`}
+          >
+            {isOnline ? "ONLINE" : "OFFLINE"}
+          </span>
         </div>
       </div>
       <Toaster />
