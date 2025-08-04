@@ -77,6 +77,75 @@ export default function JudgingPanelClient({
   >({});
   const [bestScores, setBestScores] = useState<BestScore[]>([]);
   const [submissionFlag, setSubmissionFlag] = useState<boolean>(false);
+  const [isOnline, setIsOnline] = useState<boolean>(
+    typeof navigator === "undefined" ? true : navigator.onLine
+  );
+
+  async function flushPendingScores() {
+    if (typeof window === "undefined") return;
+    const pending = JSON.parse(
+      localStorage.getItem("pendingScores") || "[]"
+    ) as {
+      round_heat_id: number;
+      run_num: number | undefined;
+      personnel_id: number;
+      score: number;
+      athlete_id: number | undefined;
+    }[];
+
+    if (!pending.length) return;
+    const remaining: typeof pending = [];
+    let anySubmitted = false;
+
+    for (const entry of pending) {
+      try {
+        const response = await fetch(
+          "/api/scores-dj18dh12gpdi1yd89178tsadji1289",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(entry),
+          }
+        );
+        if (!response.ok) {
+          remaining.push(entry);
+        } else {
+          anySubmitted = true;
+        }
+      } catch {
+        remaining.push(entry);
+      }
+    }
+
+    if (remaining.length) {
+      localStorage.setItem("pendingScores", JSON.stringify(remaining));
+    } else {
+      localStorage.removeItem("pendingScores");
+    }
+
+    if (anySubmitted) {
+      setSubmissionFlag((prev) => !prev);
+    }
+  }
+
+  useEffect(() => {
+    const updateStatus = () => setIsOnline(navigator.onLine);
+    window.addEventListener("online", updateStatus);
+    window.addEventListener("offline", updateStatus);
+    if (navigator.onLine) {
+      void flushPendingScores();
+    }
+    return () => {
+      window.removeEventListener("online", updateStatus);
+      window.removeEventListener("offline", updateStatus);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isOnline) {
+      void flushPendingScores();
+    }
+  }, [isOnline]);
 
   useEffect(() => {
     if (!eventId) return;
@@ -206,23 +275,44 @@ export default function JudgingPanelClient({
       return;
     }
 
-    console.log("SUBMITTING:", {
-      roundHeatId,
-      runNum,
-      personnelId,
-      score,
-    });
+    if (eventIsFinished) {
+      alert("Event is finished, cannot submit scores.");
+      return;
+    }
+    if (!roundHeatId || !runNum || !score) {
+      alert("Please select an athlete and enter a score.");
+      return;
+    }
+
+    const submission = {
+      round_heat_id: roundHeatId,
+      run_num: selected?.run_num,
+      personnel_id: personnelId,
+      score: parseFloat(score),
+      athlete_id: selected?.athlete_id,
+    };
+
+    console.log("SUBMITTING:", submission);
+
+    if (!isOnline) {
+      const pending = JSON.parse(
+        localStorage.getItem("pendingScores") || "[]"
+      ) as typeof submission[];
+      pending.push(submission);
+      localStorage.setItem("pendingScores", JSON.stringify(pending));
+      toast.success("Score stored offline", { position: "bottom-center" });
+      setSubmittedScores((prev) => ({
+        ...prev,
+        [`${selected?.athlete_id}-${runNum}`]: parseFloat(score),
+      }));
+      setScore("");
+      return;
+    }
 
     const response = await fetch("/api/scores-dj18dh12gpdi1yd89178tsadji1289", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        round_heat_id: roundHeatId,
-        run_num: selected?.run_num,
-        personnel_id: personnelId,
-        score: parseFloat(score),
-        athlete_id: selected?.athlete_id,
-      }),
+      body: JSON.stringify(submission),
     });
     console.log(
       `SELECTED RUN_NUM: ${selected?.run_num}, SCORE: ${score}, PERSONNEL_ID: ${personnelId}, ATHLETE_ID: ${selected?.athlete_id}, ROUND_HEAT_ID: ${roundHeatId}`
@@ -242,14 +332,6 @@ export default function JudgingPanelClient({
       setSubmissionFlag(!submissionFlag);
       setScore("");
     }
-    if (eventIsFinished) {
-      alert("Event is finished, cannot submit scores.");
-      return;
-    }
-    if (!roundHeatId || !runNum || !score) {
-      alert("Please select an athlete and enter a score.");
-      return;
-    }
   };
 
   return (
@@ -258,7 +340,13 @@ export default function JudgingPanelClient({
         <div></div>
         <div className="flex items-center justify-end bg-white border border-gray-300">
           {eventName}
-          ONLINE/OFFLINE
+          <span
+            className={`ml-2 px-2 py-1 text-xs font-bold ${
+              isOnline ? "text-green-700" : "text-red-700"
+            }`}
+          >
+            {isOnline ? "ONLINE" : "OFFLINE"}
+          </span>
         </div>
       </div>
       <Toaster />
