@@ -10,6 +10,10 @@ import {
 } from "lucide-react";
 import { Toaster, toast } from "react-hot-toast";
 import { eventNames } from "process";
+import {
+  enqueueScoreSubmission,
+  flushScoreQueue,
+} from "../lib/offlineQueue";
 
 type JudgingPanelClientProps = {
   judgingPanelPasscode: number;
@@ -77,6 +81,30 @@ export default function JudgingPanelClient({
   >({});
   const [bestScores, setBestScores] = useState<BestScore[]>([]);
   const [submissionFlag, setSubmissionFlag] = useState<boolean>(false);
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator === "undefined" ? true : navigator.onLine
+  );
+
+  useEffect(() => {
+    const handleOnlineStatus = async () => {
+      setIsOnline(navigator.onLine);
+      if (navigator.onLine) {
+        const processed = await flushScoreQueue();
+        if (processed > 0) {
+          setSubmissionFlag((prev) => !prev);
+        }
+      }
+    };
+
+    window.addEventListener("online", handleOnlineStatus);
+    window.addEventListener("offline", handleOnlineStatus);
+    handleOnlineStatus();
+
+    return () => {
+      window.removeEventListener("online", handleOnlineStatus);
+      window.removeEventListener("offline", handleOnlineStatus);
+    };
+  }, []);
 
   useEffect(() => {
     if (!eventId) return;
@@ -206,23 +234,42 @@ export default function JudgingPanelClient({
       return;
     }
 
-    console.log("SUBMITTING:", {
-      roundHeatId,
-      runNum,
-      personnelId,
-      score,
-    });
+    if (eventIsFinished) {
+      alert("Event is finished, cannot submit scores.");
+      return;
+    }
+    if (!roundHeatId || !runNum || !score) {
+      alert("Please select an athlete and enter a score.");
+      return;
+    }
+
+    const payload = {
+      round_heat_id: roundHeatId,
+      run_num: runNum,
+      personnel_id: personnelId,
+      score: parseFloat(score),
+      athlete_id: selected?.athlete_id as number,
+    };
+
+    if (!navigator.onLine) {
+      enqueueScoreSubmission(payload);
+      toast.success("Score stored offline. It will be submitted when back online", {
+        position: "bottom-center",
+      });
+      setSubmittedScores((prev) => ({
+        ...prev,
+        [`${selected?.athlete_id}-${runNum}`]: parseFloat(score),
+      }));
+      setScore("");
+      return;
+    }
+
+    console.log("SUBMITTING:", payload);
 
     const response = await fetch("/api/scores-dj18dh12gpdi1yd89178tsadji1289", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        round_heat_id: roundHeatId,
-        run_num: selected?.run_num,
-        personnel_id: personnelId,
-        score: parseFloat(score),
-        athlete_id: selected?.athlete_id,
-      }),
+      body: JSON.stringify(payload),
     });
     console.log(
       `SELECTED RUN_NUM: ${selected?.run_num}, SCORE: ${score}, PERSONNEL_ID: ${personnelId}, ATHLETE_ID: ${selected?.athlete_id}, ROUND_HEAT_ID: ${roundHeatId}`
@@ -242,14 +289,6 @@ export default function JudgingPanelClient({
       setSubmissionFlag(!submissionFlag);
       setScore("");
     }
-    if (eventIsFinished) {
-      alert("Event is finished, cannot submit scores.");
-      return;
-    }
-    if (!roundHeatId || !runNum || !score) {
-      alert("Please select an athlete and enter a score.");
-      return;
-    }
   };
 
   return (
@@ -258,7 +297,7 @@ export default function JudgingPanelClient({
         <div></div>
         <div className="flex items-center justify-end bg-white border border-gray-300">
           {eventName}
-          ONLINE/OFFLINE
+          {isOnline ? " ONLINE" : " OFFLINE"}
         </div>
       </div>
       <Toaster />
