@@ -7,7 +7,7 @@ import React, { useState, ChangeEvent, useTransition, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Papa, { ParseResult } from 'papaparse';
 // --- VVV Import the new action VVV ---
-import { validateCsvHeadersAction, checkAthletesAgainstDb, addAndRegisterAthletes, getEventDivisions, deleteRegistrationAction, getEventRoster } from './actions';
+import { validateCsvHeadersAction, checkAthletesAgainstDb, addAndRegisterAthletes, getEventDivisions, deleteRegistrationAction, getEventRoster, updateBibNumberAction } from './actions';
 import Link from 'next/link';
 import { TrashIcon, InformationCircleIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/outline';
 import type { Division, CheckedAthleteClient, AthleteToRegister, RegistrationResultDetail, RegisteredAthleteWithDivision } from '@/lib/definitions';
@@ -42,7 +42,8 @@ export default function ManageAthletesPage() {
     const [isRosterLoading, startRosterTransition] = useTransition();
     const [isChecking, startCheckTransition] = useTransition();
     const [isRegistering, startRegisterTransition] = useTransition();
-    const isLoading = isRosterLoading || isChecking || isRegistering;
+    const [isUpdatingBib, startBibTransition] = useTransition();
+    const isLoading = isRosterLoading || isChecking || isRegistering || isUpdatingBib;
 
     useEffect(() => {
         const id = parseInt(eventIdParam, 10);
@@ -120,6 +121,31 @@ export default function ManageAthletesPage() {
                 setPageSuccess(response.message);
                 setCurrentRoster(prev => prev.filter(a => !(a.athlete_id === athleteId && a.division_id === divisionId)));
             } else { setPageError(response.message); }
+        });
+    };
+
+    const handleBibChange = (athleteId: number, divisionId: number, value: string) => {
+        setCurrentRoster(prev => prev.map(a => (
+            a.athlete_id === athleteId && a.division_id === divisionId
+                ? { ...a, bib_num: value }
+                : a
+        )));
+    };
+
+    const handleSaveBib = (athleteId: number, divisionId: number, bibNum: string | null) => {
+        if (eventId === null) return;
+        setPageError(null); setPageSuccess(null);
+        startBibTransition(async () => {
+            const response = await updateBibNumberAction(eventId, athleteId, divisionId, bibNum);
+            if (response.success) {
+                setPageSuccess(response.message || 'Bib number updated.');
+                const rosterRes = await getEventRoster(eventId);
+                if (rosterRes.success && rosterRes.data) {
+                    setCurrentRoster(rosterRes.data);
+                }
+            } else {
+                setPageError(response.error || 'Failed to update bib number.');
+            }
         });
     };
     
@@ -313,7 +339,24 @@ export default function ManageAthletesPage() {
                                 <tbody>
                                     {currentRoster.map(athlete => (
                                         <tr key={`${athlete.athlete_id}-${athlete.division_id}`}>
-                                            <td>{athlete.bib_num || 'N/A'}</td>
+                                            <td>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={athlete.bib_num ?? ''}
+                                                        onChange={(e) => handleBibChange(athlete.athlete_id, athlete.division_id, e.target.value)}
+                                                        className="input input-xs w-20"
+                                                        disabled={isLoading}
+                                                    />
+                                                    <button
+                                                        className="btn btn-xs btn-outline"
+                                                        onClick={() => handleSaveBib(athlete.athlete_id, athlete.division_id, athlete.bib_num ?? null)}
+                                                        disabled={isLoading}
+                                                    >
+                                                        Save
+                                                    </button>
+                                                </div>
+                                            </td>
                                             <td>{athlete.first_name} {athlete.last_name}</td>
                                             <td>{athlete.division_name}</td>
                                             <td><button className="btn btn-xs btn-ghost text-error" onClick={() => handleDeleteRegistration(athlete.athlete_id, athlete.division_id)} disabled={isLoading}><TrashIcon className="h-4 w-4" /></button></td>

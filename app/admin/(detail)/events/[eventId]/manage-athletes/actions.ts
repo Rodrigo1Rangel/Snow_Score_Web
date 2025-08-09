@@ -278,11 +278,41 @@ export async function deleteRegistrationAction(
   }
 }
 
+// --- Action to update an athlete's bib number in an event ---
+export async function updateBibNumberAction(
+  eventId: number,
+  athleteId: number,
+  divisionId: number,
+  bibNum: string | null
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    await authorizeAction();
+
+    const pool = getDbPool();
+    const result = await pool.query(
+      `UPDATE ss_event_registrations
+       SET bib_num = $1
+       WHERE event_id = $2 AND athlete_id = $3 AND division_id = $4`,
+      [bibNum, eventId, athleteId, divisionId]
+    );
+
+    if ((result?.rowCount ?? 0) > 0) {
+      revalidatePath(`/admin/events/${eventId}/manage-athletes`);
+      return { success: true, message: 'Bib number updated.' };
+    }
+    return { success: false, error: 'Registration not found.' };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to update bib number.';
+    console.error('updateBibNumberAction error:', error);
+    return { success: false, error: message };
+  }
+}
+
 // --- Action to get the current event roster ---
-export async function getEventRoster(eventId: number): Promise<{ 
-    success: boolean; 
-    data?: RegisteredAthleteWithDivision[]; 
-    error?: string 
+export async function getEventRoster(eventId: number): Promise<{
+    success: boolean;
+    data?: RegisteredAthleteWithDivision[];
+    error?: string
 }> {
     try {
         await authorizeAction();
