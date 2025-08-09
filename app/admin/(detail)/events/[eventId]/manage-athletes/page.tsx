@@ -8,6 +8,7 @@ import { useParams } from 'next/navigation';
 import Papa, { ParseResult } from 'papaparse';
 // --- VVV Import the new action VVV ---
 import { validateCsvHeadersAction, checkAthletesAgainstDb, addAndRegisterAthletes, getEventDivisions, deleteRegistrationAction, getEventRoster, updateBibNumbersAction } from './actions';
+
 import Link from 'next/link';
 import { TrashIcon, InformationCircleIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/outline';
 import type { Division, CheckedAthleteClient, AthleteToRegister, RegistrationResultDetail, RegisteredAthleteWithDivision } from '@/lib/definitions';
@@ -150,6 +151,7 @@ export default function ManageAthletesPage() {
             const response = await updateBibNumbersAction(eventId, updates);
             if (response.success) {
                 setPageSuccess(response.message || 'Bib numbers updated.');
+
                 const rosterRes = await getEventRoster(eventId);
                 if (rosterRes.success && rosterRes.data) {
                     setCurrentRoster(rosterRes.data);
@@ -157,6 +159,7 @@ export default function ManageAthletesPage() {
                 setBibChanges({});
             } else {
                 setPageError(response.error || 'Failed to update bib numbers.');
+
             }
         });
     };
@@ -353,6 +356,7 @@ export default function ManageAthletesPage() {
                                         {currentRoster.map(athlete => (
                                             <tr key={`${athlete.athlete_id}-${athlete.division_id}`}>
                                                 <td>
+
                                                     <input
                                                         type="text"
                                                         value={athlete.bib_num ?? ''}
@@ -379,6 +383,7 @@ export default function ManageAthletesPage() {
                                 </button>
                             </div>
                         </>
+
                     ) : (
                         <p className="text-sm italic text-base-content/70 py-4">No athletes registered for this event.</p>
                     )}

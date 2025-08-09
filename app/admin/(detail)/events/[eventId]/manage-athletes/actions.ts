@@ -306,6 +306,7 @@ export async function updateBibNumbersAction(
     return { success: false, error: message };
   } finally {
     client.release();
+
   }
 }
 
