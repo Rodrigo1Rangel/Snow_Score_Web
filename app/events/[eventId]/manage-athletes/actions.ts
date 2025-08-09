@@ -81,6 +81,46 @@ export async function removeAthleteFromEventAction(eventId: number, athleteId: n
     }
 }
 
+// --- Action to Update an Athlete's Bib Number in an Event ---
+export async function updateBibNumberAction(
+    eventId: number,
+    athleteId: number,
+    bibNum: string | null
+): Promise<ActionResult> {
+    const user = await getAuthenticatedUserWithRole();
+    if (!user) return { success: false, error: "Authentication required." };
+    const allowedRoles = ['Executive Director', 'Administrator', 'Chief of Competition'];
+    if (!allowedRoles.includes(user.roleName)) {
+        return { success: false, error: "Permission denied." };
+    }
+
+    if (isNaN(eventId) || isNaN(athleteId)) {
+        return { success: false, error: "Invalid Event or Athlete ID." };
+    }
+
+    const pool = getDbPool();
+    let client: PoolClient | null = null;
+    try {
+        client = await pool.connect();
+        const result = await client.query(
+            "UPDATE ss_event_registrations SET bib_num = $1 WHERE event_id = $2 AND athlete_id = $3",
+            [bibNum, eventId, athleteId]
+        );
+
+        if (result.rowCount != null && result.rowCount > 0) {
+            revalidatePath(`/admin/events/${eventId}/manage-athletes`);
+            return { success: true, message: "Bib number updated." };
+        } else {
+            return { success: false, error: "Athlete not found in this event." };
+        }
+    } catch (error) {
+        console.error("updateBibNumberAction error:", error);
+        return { success: false, error: "Database error updating bib number." };
+    } finally {
+        if (client) client.release();
+    }
+}
+
 // Zod schema for a single row in the CSV
 const CsvAthleteRowSchema = z.object({
     first_name: z.string().trim().min(1, "First name is required."),

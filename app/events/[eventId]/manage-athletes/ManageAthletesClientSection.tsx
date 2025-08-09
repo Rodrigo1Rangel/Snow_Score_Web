@@ -6,7 +6,8 @@ import type { RegisteredAthlete } from '@/lib/definitions';
 import {
     getEventAthletesAction,
     removeAthleteFromEventAction,
-    importAthletesFromCsvAction
+    importAthletesFromCsvAction,
+    updateBibNumberAction
 } from './actions'; // Assuming actions.ts is in the same directory
 
 interface ManageAthletesClientSectionProps {
@@ -86,6 +87,27 @@ export default function ManageAthletesClientSection({ eventId, initialAthletes }
                 refreshAthletesList();
             } else {
                 setFeedback({ type: 'error', message: result.error || 'Failed to remove athlete.' });
+            }
+        });
+    };
+
+    const handleBibChange = (athleteId: number, value: string) => {
+        setAthletes((prev) =>
+            prev.map((ath) =>
+                ath.athlete_id === athleteId ? { ...ath, bib_num: value } : ath
+            )
+        );
+    };
+
+    const handleSaveBibClick = (athleteId: number, bibNum: string | null) => {
+        setFeedback(null);
+        startTransition(async () => {
+            const result = await updateBibNumberAction(eventId, athleteId, bibNum);
+            if (result.success) {
+                setFeedback({ type: 'success', message: result.message || 'Bib number updated.' });
+                refreshAthletesList();
+            } else {
+                setFeedback({ type: 'error', message: result.error || 'Failed to update bib number.' });
             }
         });
     };
@@ -174,7 +196,24 @@ export default function ManageAthletesClientSection({ eventId, initialAthletes }
                                     {athletes.map((athlete) => (
                                         <tr key={athlete.athlete_id}>
                                             <td>{athlete.first_name} {athlete.last_name}</td>
-                                            <td>{athlete.bib_num || <span className="italic text-xs">N/A</span>}</td>
+                                            <td>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={athlete.bib_num ?? ''}
+                                                        onChange={(e) => handleBibChange(athlete.athlete_id, e.target.value)}
+                                                        className="input input-xs w-20"
+                                                        disabled={isProcessing}
+                                                    />
+                                                    <button
+                                                        onClick={() => handleSaveBibClick(athlete.athlete_id, athlete.bib_num ? athlete.bib_num : null)}
+                                                        className="btn btn-xs btn-outline"
+                                                        disabled={isProcessing}
+                                                    >
+                                                        Save
+                                                    </button>
+                                                </div>
+                                            </td>
                                             <td className="text-right">
                                                 <button
                                                     onClick={() => handleRemoveAthleteClick(athlete.athlete_id)}
